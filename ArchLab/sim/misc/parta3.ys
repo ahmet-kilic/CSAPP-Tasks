@@ -1,0 +1,90 @@
+    .pos 0 # setup code
+    irmovq stack, %rsp
+    call main
+    halt
+
+    # an array of 9 elements
+    # again, positioned absolutely
+.pos 0x100
+array:
+    .quad 0x000000001
+    .quad 0x000000020
+    .quad 0x000000300
+    # a pointer to the fourth element here
+arrayp3:
+    .quad 0x000004000
+    .quad 0x000050000
+    .quad 0x000600000
+    .quad 0x007000000
+    .quad 0x080000000
+    .quad 0x900000000
+
+main:
+    irmovq arrayp3, %rdi
+    irmovq array, %rsi
+    irmovq $5, %rdx
+    call move
+    ret
+
+# Part A
+move:
+  # rdi = dst, rsi = src, rdx = len
+  irmovq $1,%r9
+  irmovq $8,%r11
+  # cmp rsi rdi
+  pushq %rdi
+	subq	%rsi, %rdi
+  popq  %rdi
+	jle	condA
+	# leaq	(%rsi,%rdx,8), %rax / rax = rsi + 8*rdx
+  rrmovq %rdx, %rax
+  addq   %rax, %rax
+  addq   %rax, %rax
+  addq   %rax, %rax
+  addq   %rsi, %rax
+  #
+  # cmp rdi,rax
+  pushq %rax
+	subq	%rdi, %rax
+  popq  %rax
+	jle	condD
+	# leaq	-8(,%rdx,8), %rax
+  rrmovq %rdx, %rax
+  addq   %rax, %rax
+  addq   %rax, %rax
+  addq   %rax, %rax
+  subq   %r11, %rax
+  #
+	addq	%rax, %rdi
+	addq	%rax, %rsi
+	irmovq	$-1, %r8
+	jmp	condB
+condA:
+	irmovq	$1, %r8
+condB:
+	irmovq	$0, %rcx
+loop:
+	andq	%rdx, %rdx
+	jle	condE
+	mrmovq	(%rsi), %rax
+	xorq	%rax, %rcx
+	rmmovq	%rax, (%rdi)
+	# leaq	0(,%r8,8), %rax
+  rrmovq %r8, %rax
+  addq   %rax, %rax
+  addq   %rax, %rax
+  addq   %rax, %rax
+  #
+	addq	%rax, %rdi
+	addq	%rax, %rsi
+	subq	%r9, %rdx
+	jmp	loop
+condD:
+	irmovq	$1, %r8
+	jmp	condB
+condE:
+	rrmovq	%rcx, %rax
+	ret
+# stack grows upwards, so leave some space
+.pos 0x300
+stack:

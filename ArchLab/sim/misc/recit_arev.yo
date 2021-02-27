@@ -1,0 +1,48 @@
+0x000:                      |     .pos 0 # setup code
+0x000: 30f40003000000000000 |     irmovq stack, %rsp
+0x00a: 804801000000000000   |     call main
+0x013: 00                   |     halt
+                            | 
+                            | # the array to reverse
+0x100:                      | .pos 0x100 # hexadecimal
+0x100:                      | array:
+0x100: 0100000000000000     |     .quad 1 # decimal
+0x108: 0200000000000000     |     .quad 2
+0x110: 0300000000000000     |     .quad 3
+0x118: 0400000000000000     |     .quad 4
+0x120: 0500000000000000     |     .quad 5
+0x128: 0600000000000000     |     .quad 6
+0x130: 0700000000000000     |     .quad 7
+0x138: 0800000000000000     |     .quad 8
+0x140:                      | array_last:
+0x140: 0900000000000000     |     .quad 9
+                            | 
+0x148:                      | main:
+0x148: 30f70001000000000000 |     irmovq array, %rdi
+0x152: 30f64001000000000000 |     irmovq array_last, %rsi
+0x15c: 30f20900000000000000 |     irmovq $9, %rdx
+0x166: 807001000000000000   |     call arev
+0x16f: 90                   |     ret
+                            | 
+0x170:                      | arev:
+                            |     # a = %rdi, a_last = %rsi, len = %rdx
+0x170: 30fe0200000000000000 |     irmovq $2, %r14     # 2 for len decr
+0x17a: 30f80800000000000000 |     irmovq $8, %r8      # 8 for pointer incr/decr
+0x184: 6222                 |     andq %rdx, %rdx     # length check 
+0x186: 769001000000000000   |     jg loop             # return if <= 0
+0x18f: 90                   |     ret
+0x190:                      | loop:
+0x190: 50b70000000000000000 |     mrmovq (%rdi), %r11 # move both values to registers
+0x19a: 50c60000000000000000 |     mrmovq (%rsi), %r12
+0x1a4: 40b60000000000000000 |     rmmovq %r11, (%rsi) # then move them into mem, swapped
+0x1ae: 40c70000000000000000 |     rmmovq %r12, (%rdi)
+0x1b8: 6087                 |     addq %r8, %rdi      # add and sub 8 from pointers
+0x1ba: 6186                 |     subq %r8, %rsi
+0x1bc: 61e2                 |     subq %r14, %rdx     # sub 2 from len
+0x1be: 769001000000000000   |     jg loop             # continue if not done (len > 0)
+                            |     
+0x1c7: 90                   |     ret                 # got out of loop, quit the function
+                            | 
+                            | # stack grows upwards, so leave some space
+0x300:                      | .pos 0x300
+0x300:                      | stack:

@@ -1,0 +1,223 @@
+                            | #/* $begin ncopy-ys */
+                            | ##################################################################
+                            | # ncopy.ys - Copy a src block of len words to dst.
+                            | # Return the number of positive words (>0) contained in src.
+                            | #
+                            | # Include your name and ID here.
+                            | # Ahmet Emre KILIÇ 2380616
+                            | #	Modifications:
+                            | # 1. Added 8x8 Loop Unroller
+                            | # 2. Changed the places of load and copy instructions to avoid stalling from load/use hazard
+                            | # 3. Added a JumpTree (very much alike jump table) for the leftovers after the loop
+                            | # 4. Changed constant registers + addq to iaddq for better performance
+                            | # As the modifications state, this function basically evaluates 8 elements at once and then uses a JumpTree for the leftover elements from the Loop
+                            | #
+                            | # Why 8x8 ? There was no direct choosing for the size other than the fact that JumpTree works best for higher sizes such as 8,10,12
+                            | # maybe there is an increase in performance for higher sizes but i could not do it since idea of JumpTree came to my mind at last second
+                            | #
+                            | # What is this JumpTree? JumpTree is basically tree version of JumpTable, it dynamically detects how many elements are leftover from the main loop
+                            | # and jumps to the remaining length and falls through from there.
+                            | #
+                            | # Isn't code portion
+                            | #				mrmovq 40(%rdi), %r11	# read val from src
+                            | #				jle CF6COND
+                            | # very dangerous ? At first hand it looks very dangerous, but JumpTree never uses jg to jump directly to the table, so since CC for greater cond. will
+                            | # not be set beforehand, it always jumps ahead to CFXCOND incase of direct jump from the table.
+                            | #
+                            | #	CF7:
+                            | #	mrmovq 48(%rdi), %r11	# read val from src
+                            | #	rmmovq %r11, 48(%rsi)	# and cpy into dest
+                            | #	andq %r11, %r11				# val <= 0 ? CC Set for 7th element
+                            | # There is stalling in this code portion ? Unfortunately i could not find a way to properly prevent this stalling. Initially i thought doing it just as i did
+                            | # in loop unrollers would be fine, but since in the loop unrollers it is guaranteed that there will be 8 elements it can set the values beforehand meanwhile it is not
+                            | # guaranteed for leftovers.
+                            | #
+                            | # Sidenote: Only way to make this more optimized would be choosing a better size (probably) and impletenting a JumpTable with jmpq.
+                            | #
+                            | #
+                            | ##################################################################
+                            | # Do not modify this portion
+                            | # Function prologue.
+                            | # %rdi = src, %rsi = dst, %rdx = len
+0x000:                      | ncopy:
+                            | 
+                            | ##################################################################
+                            | # You can modify this portion
+                            | 	# Loop header
+0x000: 6300                 | 	xorq %rax,%rax		# count = 0
+0x002: c0f2f6ffffffffffffff | 	iaddq $-10,%rdx		# len < 8?
+0x00c: 72d601000000000000   | 	jl DoRest			# if so, goto JumpTree for leftovers:
+0x015:                      | Npos0:
+0x015: 50a70000000000000000 | 	mrmovq (%rdi), %r10		# read val from src...
+0x01f: 50b70800000000000000 | 	mrmovq 8(%rdi), %r11	# read val from src...
+0x029: 40a60000000000000000 | 	rmmovq %r10, (%rsi)		# ...and store it to dst
+0x033: 62aa                 | 	andq %r10, %r10				# val <= 0?
+0x035: 714800000000000000   | 	jle Npos1							# if so, goto Npos1:
+0x03e: c0f00100000000000000 | 	iaddq $1, %rax				# count++
+0x048:                      | Npos1:
+0x048: 50a71000000000000000 | 	mrmovq 16(%rdi), %r10	# read val from src...
+0x052: 40b60800000000000000 | 	rmmovq %r11, 8(%rsi)	# ...and store it to dst
+0x05c: 62bb                 | 	andq %r11, %r11				# val <= 0?
+0x05e: 717100000000000000   | 	jle Npos2							# if so, goto Npos2:
+0x067: c0f00100000000000000 | 	iaddq $1, %rax				# count++
+0x071:                      | Npos2:
+0x071: 50b71800000000000000 | 	mrmovq 24(%rdi), %r11	# read val from src...
+0x07b: 40a61000000000000000 | 	rmmovq %r10, 16(%rsi)	# ...and store it to dst
+0x085: 62aa                 | 	andq %r10, %r10				# val <= 0?
+0x087: 719a00000000000000   | 	jle Npos3							# if so, goto Npos3:
+0x090: c0f00100000000000000 | 	iaddq $1, %rax				# count++
+0x09a:                      | Npos3:
+0x09a: 50a72000000000000000 | 	mrmovq 32(%rdi), %r10	# read val from src...
+0x0a4: 40b61800000000000000 | 	rmmovq %r11, 24(%rsi)	# ...and store it to dst
+0x0ae: 62bb                 | 	andq %r11, %r11				# val <= 0?
+0x0b0: 71c300000000000000   | 	jle Npos4							# if so, goto Npos4:
+0x0b9: c0f00100000000000000 | 	iaddq $1, %rax				# count++
+0x0c3:                      | Npos4:
+0x0c3: 50b72800000000000000 | 	mrmovq 40(%rdi), %r11	# read val from src...
+0x0cd: 40a62000000000000000 | 	rmmovq %r10, 32(%rsi)	# ...and store it to dst
+0x0d7: 62aa                 | 	andq %r10, %r10				# val <= 0?
+0x0d9: 71ec00000000000000   | 	jle Npos5							# if so, goto Npos5:
+0x0e2: c0f00100000000000000 | 	iaddq $1, %rax				# count++
+0x0ec:                      | Npos5:
+0x0ec: 50a73000000000000000 | 	mrmovq 48(%rdi), %r10	# read val from src...
+0x0f6: 40b62800000000000000 | 	rmmovq %r11, 40(%rsi)	# ...and store it to dst
+0x100: 62bb                 | 	andq %r11, %r11				# val <= 0?
+0x102: 711501000000000000   | 	jle Npos6							# if so, goto Npos6:
+0x10b: c0f00100000000000000 | 	iaddq $1, %rax				# count++
+0x115:                      | Npos6:
+0x115: 50b73800000000000000 | 	mrmovq 56(%rdi), %r11	# read val from src...
+0x11f: 40a63000000000000000 | 	rmmovq %r10, 48(%rsi)	# ...and store it to dst
+0x129: 62aa                 | 	andq %r10, %r10				# val <= 0?
+0x12b: 713e01000000000000   | 	jle Npos7							# if so, goto Npos7:
+0x134: c0f00100000000000000 | 	iaddq $1, %rax				# count++
+0x13e:                      | Npos7:
+0x13e: 50a74000000000000000 | 	mrmovq 64(%rdi), %r10	# read val from src...
+0x148: 40b63800000000000000 | 	rmmovq %r11, 56(%rsi)	# ...and store it to dst
+0x152: 62bb                 | 	andq %r11, %r11		# val <= 0?
+0x154: 716701000000000000   | 	jle Npos8		# if so, goto Loop9:
+0x15d: c0f00100000000000000 | 	iaddq $1, %rax
+0x167:                      | Npos8:
+0x167: 50b74800000000000000 | 	mrmovq 72(%rdi), %r11	# read val from src...
+0x171: 40a64000000000000000 | 	rmmovq %r10, 64(%rsi)	# ...and store it to dst
+0x17b: 62aa                 | 	andq %r10, %r10		# val <= 0?
+0x17d: 719001000000000000   | 	jle Npos9		# if so, goto Loop10:
+0x186: c0f00100000000000000 | 	iaddq $1, %rax		# count++
+0x190:                      | Npos9:	#mrmovq 64(%rdi), %r10	# read val from src...
+0x190: 40b64800000000000000 | 	rmmovq %r11, 72(%rsi)	# ...and store it to dst
+0x19a: 62bb                 | 	andq %r11, %r11		# val <= 0?
+0x19c: 71af01000000000000   | 	jle Unroll		# if so, goto Loop:
+0x1a5: c0f00100000000000000 | 	iaddq $1, %rax		# count++
+0x1af:                      | Unroll:
+0x1af: c0f75000000000000000 | 	iaddq $80, %rdi				# src += 8
+0x1b9: c0f65000000000000000 | 	iaddq $80, %rsi				# dst += 8
+0x1c3: c0f2f6ffffffffffffff | 	iaddq $-10,%rdx				# len >= 8?
+0x1cd: 751500000000000000   | 	jge Npos0							# if so, goto Npos0:
+                            | 
+0x1d6:                      | DoRest:
+0x1d6: c0f20a00000000000000 | 	iaddq $10, %rdx
+0x1e0: 6022                 | 	addq %rdx, %rdx
+0x1e2: 6022                 | 	addq %rdx, %rdx
+0x1e4: 6022                 | 	addq %rdx, %rdx
+0x1e6: c0f20002000000000000 | 	iaddq jumptable, %rdx
+0x1f0: 50220000000000000000 | 	mrmovq (%rdx), %rdx
+0x1fa: 61dd                 | 	subq %r13, %r13
+0x1fc: e02f                 | 	jmpq %rdx
+0x200:                      | 	.align 8
+0x200:                      | 	jumptable:
+0x200: c103000000000000     | 		.quad Done
+0x208: 8503000000000000     | 		.quad Remain1
+0x210: 5c03000000000000     | 		.quad Remain2
+0x218: 3303000000000000     | 		.quad Remain3
+0x220: 0a03000000000000     | 		.quad Remain4
+0x228: e102000000000000     | 		.quad Remain5
+0x230: b802000000000000     | 		.quad Remain6
+0x238: 8f02000000000000     | 		.quad Remain7
+0x240: 6602000000000000     | 		.quad Remain8
+0x248: 5002000000000000     | 		.quad Remain9
+                            | 
+                            | 
+0x250:                      | Remain9:
+0x250: 50b74000000000000000 | 	mrmovq 64(%rdi), %r11	# read val from src...
+0x25a: 40b64000000000000000 | 	rmmovq %r11, 64(%rsi)
+0x264: 62bb                 | 	andq %r11, %r11		# val <= 0?
+                            | 
+0x266:                      | Remain8:
+0x266: 50b73800000000000000 | 	mrmovq 56(%rdi), %r11	# read val from src...
+0x270: 718302000000000000   | 	jle Remain82		# if so, goto Npos:
+0x279: c0f00100000000000000 | 	iaddq $0x1, %rax		# count++
+                            | 
+0x283:                      | Remain82:
+                            | 
+0x283: 40b63800000000000000 | 	rmmovq %r11, 56(%rsi)
+0x28d: 62bb                 | 	andq %r11, %r11		# val <= 0?
+0x28f:                      | Remain7:
+0x28f: 50b73000000000000000 | 	mrmovq 48(%rdi), %r11	# read val from src...
+0x299: 71ac02000000000000   | 	jle Remain72		# if so, goto Npos:
+0x2a2: c0f00100000000000000 | 	iaddq $0x1, %rax		# count++
+0x2ac:                      | Remain72:
+                            | 
+0x2ac: 40b63000000000000000 | 	rmmovq %r11, 48(%rsi)
+0x2b6: 62bb                 | 	andq %r11, %r11		# val <= 0?
+                            | 
+0x2b8:                      | Remain6:
+0x2b8: 50b72800000000000000 | 	mrmovq 40(%rdi), %r11	# read val from src...
+0x2c2: 71d502000000000000   | 	jle Remain62		# if so, goto Npos:
+0x2cb: c0f00100000000000000 | 	iaddq $0x1, %rax		# count++
+0x2d5:                      | Remain62:
+                            | 
+0x2d5: 40b62800000000000000 | 	rmmovq %r11, 40(%rsi)
+0x2df: 62bb                 | 	andq %r11, %r11		# val <= 0?
+0x2e1:                      | Remain5:
+0x2e1: 50b72000000000000000 | 	mrmovq 32(%rdi), %r11	# read val from src...
+0x2eb: 71fe02000000000000   | 	jle Remain52		# if so, goto Npos:
+0x2f4: c0f00100000000000000 | 	iaddq $0x1, %rax		# count++
+0x2fe:                      | Remain52:
+                            | 
+0x2fe: 40b62000000000000000 | 	rmmovq %r11, 32(%rsi)
+0x308: 62bb                 | 	andq %r11, %r11		# val <= 0?
+0x30a:                      | Remain4:
+0x30a: 50b71800000000000000 | 	mrmovq 24(%rdi), %r11	# read val from src...
+0x314: 712703000000000000   | 	jle Remain42	# if so, goto Npos:
+0x31d: c0f00100000000000000 | 	iaddq $0x1, %rax		# count++
+0x327:                      | Remain42:
+                            | 
+0x327: 40b61800000000000000 | 	rmmovq %r11, 24(%rsi)
+0x331: 62bb                 | 	andq %r11, %r11		# val <= 0?
+0x333:                      | Remain3:
+0x333: 50b71000000000000000 | 	mrmovq 16(%rdi), %r11	# read val from src...
+0x33d: 715003000000000000   | 	jle Remain32		# if so, goto Npos:
+0x346: c0f00100000000000000 | 	iaddq $0x1, %rax		# count++
+0x350:                      | Remain32:
+                            | 
+0x350: 40b61000000000000000 | 	rmmovq %r11, 16(%rsi)
+0x35a: 62bb                 | 	andq %r11, %r11		# val <= 0?
+0x35c:                      | Remain2:
+0x35c: 50b70800000000000000 | 	mrmovq 8(%rdi), %r11	# read val from src...
+0x366: 717903000000000000   | 	jle Remain22		# if so, goto Npos:
+0x36f: c0f00100000000000000 | 	iaddq $0x1, %rax		# count++
+0x379:                      | Remain22:
+                            | 
+0x379: 40b60800000000000000 | 	rmmovq %r11, 8(%rsi)
+0x383: 62bb                 | 	andq %r11, %r11		# val <= 0?
+0x385:                      | Remain1:
+0x385: 50b70000000000000000 | 	mrmovq (%rdi), %r11	# read val from src...
+0x38f: 71a203000000000000   | 	jle Remain12		# if so, goto Npos:
+0x398: c0f00100000000000000 | 	iaddq $0x1, %rax		# count++
+0x3a2:                      | Remain12:
+                            | 
+0x3a2: 40b60000000000000000 | 	rmmovq %r11, (%rsi)
+0x3ac: 62bb                 | 	andq %r11, %r11		# val <= 0?
+0x3ae: 71c103000000000000   | 	jle Done		# if so, goto Npos:
+0x3b7: c0f00100000000000000 | 	iaddq $0x1, %rax		# count++
+                            | 
+                            | 
+                            | 
+                            | ##################################################################
+                            | # Do not modify the following section of code
+                            | # Function epilogue.
+0x3c1:                      | Done:
+0x3c1: 90                   | 	ret
+                            | ##################################################################
+                            | # Keep the following label at the end of your function
+0x3c2:                      | End:
+                            | #/* $end ncopy-ys */

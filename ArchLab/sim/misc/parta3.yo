@@ -1,0 +1,90 @@
+0x000:                      |     .pos 0 # setup code
+0x000: 30f40003000000000000 |     irmovq stack, %rsp
+0x00a: 804801000000000000   |     call main
+0x013: 00                   |     halt
+                            | 
+                            |     # an array of 9 elements
+                            |     # again, positioned absolutely
+0x100:                      | .pos 0x100
+0x100:                      | array:
+0x100: 0100000000000000     |     .quad 0x000000001
+0x108: 2000000000000000     |     .quad 0x000000020
+0x110: 0003000000000000     |     .quad 0x000000300
+                            |     # a pointer to the fourth element here
+0x118:                      | arrayp3:
+0x118: 0040000000000000     |     .quad 0x000004000
+0x120: 0000050000000000     |     .quad 0x000050000
+0x128: 0000600000000000     |     .quad 0x000600000
+0x130: 0000000700000000     |     .quad 0x007000000
+0x138: 0000008000000000     |     .quad 0x080000000
+0x140: 0000000009000000     |     .quad 0x900000000
+                            | 
+0x148:                      | main:
+0x148: 30f71801000000000000 |     irmovq arrayp3, %rdi
+0x152: 30f60001000000000000 |     irmovq array, %rsi
+0x15c: 30f20500000000000000 |     irmovq $5, %rdx
+0x166: 807001000000000000   |     call move
+0x16f: 90                   |     ret
+                            | 
+                            | # Part A
+0x170:                      | move:
+                            |   # rdi = dst, rsi = src, rdx = len
+0x170: 30f90100000000000000 |   irmovq $1,%r9
+0x17a: 30fb0800000000000000 |   irmovq $8,%r11
+                            |   # cmp rsi rdi
+0x184: a07f                 |   pushq %rdi
+0x186: 6167                 | 	subq	%rsi, %rdi
+0x188: b07f                 |   popq  %rdi
+0x18a: 71cd01000000000000   | 	jle	condA
+                            | 	# leaq	(%rsi,%rdx,8), %rax / rax = rsi + 8*rdx
+0x193: 2020                 |   rrmovq %rdx, %rax
+0x195: 6000                 |   addq   %rax, %rax
+0x197: 6000                 |   addq   %rax, %rax
+0x199: 6000                 |   addq   %rax, %rax
+0x19b: 6060                 |   addq   %rsi, %rax
+                            |   #
+                            |   # cmp rdi,rax
+0x19d: a00f                 |   pushq %rax
+0x19f: 6170                 | 	subq	%rdi, %rax
+0x1a1: b00f                 |   popq  %rax
+0x1a3: 711902000000000000   | 	jle	condD
+                            | 	# leaq	-8(,%rdx,8), %rax
+0x1ac: 2020                 |   rrmovq %rdx, %rax
+0x1ae: 6000                 |   addq   %rax, %rax
+0x1b0: 6000                 |   addq   %rax, %rax
+0x1b2: 6000                 |   addq   %rax, %rax
+0x1b4: 61b0                 |   subq   %r11, %rax
+                            |   #
+0x1b6: 6007                 | 	addq	%rax, %rdi
+0x1b8: 6006                 | 	addq	%rax, %rsi
+0x1ba: 30f8ffffffffffffffff | 	irmovq	$-1, %r8
+0x1c4: 70d701000000000000   | 	jmp	condB
+0x1cd:                      | condA:
+0x1cd: 30f80100000000000000 | 	irmovq	$1, %r8
+0x1d7:                      | condB:
+0x1d7: 30f10000000000000000 | 	irmovq	$0, %rcx
+0x1e1:                      | loop:
+0x1e1: 6222                 | 	andq	%rdx, %rdx
+0x1e3: 712c02000000000000   | 	jle	condE
+0x1ec: 50060000000000000000 | 	mrmovq	(%rsi), %rax
+0x1f6: 6301                 | 	xorq	%rax, %rcx
+0x1f8: 40070000000000000000 | 	rmmovq	%rax, (%rdi)
+                            | 	# leaq	0(,%r8,8), %rax
+0x202: 2080                 |   rrmovq %r8, %rax
+0x204: 6000                 |   addq   %rax, %rax
+0x206: 6000                 |   addq   %rax, %rax
+0x208: 6000                 |   addq   %rax, %rax
+                            |   #
+0x20a: 6007                 | 	addq	%rax, %rdi
+0x20c: 6006                 | 	addq	%rax, %rsi
+0x20e: 6192                 | 	subq	%r9, %rdx
+0x210: 70e101000000000000   | 	jmp	loop
+0x219:                      | condD:
+0x219: 30f80100000000000000 | 	irmovq	$1, %r8
+0x223: 70d701000000000000   | 	jmp	condB
+0x22c:                      | condE:
+0x22c: 2010                 | 	rrmovq	%rcx, %rax
+0x22e: 90                   | 	ret
+                            | # stack grows upwards, so leave some space
+0x300:                      | .pos 0x300
+0x300:                      | stack:

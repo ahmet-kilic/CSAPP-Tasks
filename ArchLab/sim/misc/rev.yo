@@ -1,0 +1,47 @@
+                            | # Ahmet Emre KILIÇ 2380616
+0x000:                      |     .pos 0 # setup code
+0x000: 30f40003000000000000 |     irmovq stack, %rsp
+0x00a: 805001000000000000   |     call main
+0x013: 00                   |     halt
+                            | 
+                            | # the array to reverse
+0x100:                      | .pos 0x100
+0x100:                      | ele0:
+0x100: 0a00000000000000     |     .quad 0x0000a
+0x108: 1001000000000000     |     .quad ele1
+0x110:                      | ele1:
+0x110: b000000000000000     |     .quad 0x000b0
+0x118: 2001000000000000     |     .quad ele2
+0x120:                      | ele2:
+0x120: 000c000000000000     |     .quad 0x00c00
+0x128: 3001000000000000     |     .quad ele3
+0x130:                      | ele3:
+0x130: 00d0000000000000     |     .quad 0x0d000
+0x138: 4001000000000000     |     .quad ele4
+0x140:                      | ele4:
+0x140: 00000e0000000000     |     .quad 0xe0000
+0x148: 0000000000000000     |     .quad 0
+                            | 
+0x150:                      | main:
+0x150: 30f70001000000000000 |     irmovq ele0, %rdi
+0x15a: 806401000000000000   |     call rev
+0x163: 90                   |     ret
+                            | 
+                            | # Part A
+0x164:                      | rev:
+                            |     # head = %rdi
+0x164: 30f00000000000000000 |     irmovq $0, %rax         # prev initialization
+0x16e:                      | loop:
+0x16e: 6277                 |     andq    %rdi,%rdi       # check head if 0
+0x170: 739a01000000000000   |     je return
+0x179: 50a70800000000000000 |     mrmovq  8(%rdi), %r10   # next = head->next
+0x183: 40070800000000000000 |     rmmovq  %rax, 8(%rdi)   # head->next = prev
+0x18d: 2070                 |     rrmovq  %rdi, %rax      # prev = head
+0x18f: 20a7                 |     rrmovq  %r10, %rdi      # head = next
+0x191: 706e01000000000000   |     jmp loop
+0x19a:                      | return:
+0x19a: 90                   |     ret
+                            | 
+                            | # stack grows upwards, so leave some space
+0x300:                      | .pos 0x300
+0x300:                      | stack:

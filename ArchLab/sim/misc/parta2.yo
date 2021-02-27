@@ -1,0 +1,55 @@
+0x000:                      |     .pos 0 # setup code
+0x000: 30f40003000000000000 |     irmovq stack, %rsp
+0x00a: 805001000000000000   |     call main
+0x013: 00                   |     halt
+                            | 
+                            | # the array to reverse
+0x100:                      | .pos 0x100
+0x100:                      | ele0:
+0x100: 0a00000000000000     |     .quad 0x0000a
+0x108: 1001000000000000     |     .quad ele1
+0x110:                      | ele1:
+0x110: b000000000000000     |     .quad 0x000b0
+0x118: 2001000000000000     |     .quad ele2
+0x120:                      | ele2:
+0x120: 000c000000000000     |     .quad 0x00c00
+0x128: 3001000000000000     |     .quad ele3
+0x130:                      | ele3:
+0x130: 00d0000000000000     |     .quad 0x0d000
+0x138: 4001000000000000     |     .quad ele4
+0x140:                      | ele4:
+0x140: 00000e0000000000     |     .quad 0xe0000
+0x148: 0000000000000000     |     .quad 0
+                            | 
+0x150:                      | main:
+0x150: 30f70001000000000000 |     irmovq ele0, %rdi
+0x15a: 806401000000000000   |     call rrev
+0x163: 90                   |     ret
+                            | 
+                            | # Part A
+0x164:                      | rrev:
+                            |     # head = %rdi
+0x164: a03f                 |     pushq   %rbx        # rev_head
+0x166: 2073                 |     rrmovq  %rdi, %rbx       # check head or head->next if 0
+0x168: 6277                 |     andq    %rdi, %rdi
+0x16a: 73bc01000000000000   |     je rhead
+0x173: 50770800000000000000 |     mrmovq  8(%rdi), %rdi
+0x17d: 6277                 |     andq    %rdi, %rdi
+0x17f: 73c701000000000000   |     je rnext
+0x188: 806401000000000000   |     call rrev
+0x191: 50a30800000000000000 |     mrmovq  8(%rbx), %r10   # r10 = head->next
+0x19b: 403a0800000000000000 |     rmmovq  %rbx, 8(%r10)   # r10->next = rbx
+0x1a5: 30f90000000000000000 |     irmovq  $0, %r9
+0x1af: 40930800000000000000 |     rmmovq  %r9, 8(%rbx)     # head = 0
+0x1b9:                      | poprbx:
+0x1b9: b03f                 |     popq %rbx
+0x1bb: 90                   |     ret
+0x1bc:                      | rhead:
+0x1bc: 2070                 |     rrmovq %rdi, %rax
+0x1be: 70b901000000000000   |     jmp poprbx
+0x1c7:                      | rnext:
+0x1c7: 2030                 |     rrmovq %rbx, %rax
+0x1c9: 70b901000000000000   |     jmp poprbx
+                            | # stack grows upwards, so leave some space
+0x300:                      | .pos 0x300
+0x300:                      | stack:

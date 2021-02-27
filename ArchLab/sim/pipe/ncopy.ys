@@ -1,0 +1,208 @@
+#/* $begin ncopy-ys */
+##################################################################
+# ncopy.ys - Copy a src block of len words to dst.
+# Return the number of positive words (>0) contained in src.
+#
+# Include your name and ID here.
+# Ahmet Emre KILIÇ 2380616
+#
+#	Modifications:
+# 1. Added 10x10 Loop Unroller
+# 2. Changed the places of load and copy instructions to avoid stalling from load/use hazard
+# 3. Added jmpq and JumpTable
+# 4. Changed constant registers + addq to iaddq for better performance
+# As the modifications state, this function basically evaluates 10 elements at once and then uses a JumpTable for the leftover elements from the Loop
+#
+# Why 10x10 ? There was no direct choosing for the size other than the fact that JumpTable works best for higher sizes such as 8,10,12
+# maybe there is an increase in performance for higher sizes but my file size was already at ~960 bytes so i dont think i would be able to increase size to 12
+#
+# Isn't code portion
+#				mrmovq 40(%rdi), %r11	# read val from src
+#				jle CF6COND
+# very dangerous ? At first hand it looks very dangerous, but in the calculations for the jumptable program takes advantage of the stall between mrmovq and jmpq, rather than Stalling
+# i inserted subq to set the condition codes beforehand so that code works accordingly.
+#
+#	CF7:
+#	mrmovq 48(%rdi), %r11	# read val from src
+#	rmmovq %r11, 48(%rsi)	# and cpy into dest
+#	andq %r11, %r11				# val <= 0 ? CC Set for 7th element
+# There is stalling in this code portion ? Unfortunately i could not find a way to properly prevent this stalling. Initially i thought doing it just as i did
+# in loop unrollers would be fine, but since in the loop unrollers it is guaranteed that there will be 10 elements it can set the values beforehand meanwhile it is not
+# guaranteed for leftovers.
+#
+# Sidenote: Most probably further modifications to pipe-full.hcl will increase the performance and maybe some reformatting of the instructions might help increase performance
+#
+##################################################################
+# Do not modify this portion
+# Function prologue.
+# %rdi = src, %rsi = dst, %rdx = len
+ncopy:
+
+##################################################################
+# You can modify this portion
+	# Loop header
+	xorq %rax,%rax		# count = 0
+	iaddq $-10,%rdx		# len < 10?
+	jl DoRest			# if so, goto DoRest for leftovers:
+Npos0:
+	mrmovq (%rdi), %r10		# read val from src...
+	mrmovq 8(%rdi), %r11	# read val from src...
+	rmmovq %r10, (%rsi)		# ...and store it to dst
+	andq %r10, %r10				# val <= 0?
+	jle Npos1							# if so, goto Npos1:
+	iaddq $1, %rax				# count++
+Npos1:
+	mrmovq 16(%rdi), %r10	# read val from src...
+	rmmovq %r11, 8(%rsi)	# ...and store it to dst
+	andq %r11, %r11				# val <= 0?
+	jle Npos2							# if so, goto Npos2:
+	iaddq $1, %rax				# count++
+Npos2:
+	mrmovq 24(%rdi), %r11	# read val from src...
+	rmmovq %r10, 16(%rsi)	# ...and store it to dst
+	andq %r10, %r10				# val <= 0?
+	jle Npos3							# if so, goto Npos3:
+	iaddq $1, %rax				# count++
+Npos3:
+	mrmovq 32(%rdi), %r10	# read val from src...
+	rmmovq %r11, 24(%rsi)	# ...and store it to dst
+	andq %r11, %r11				# val <= 0?
+	jle Npos4							# if so, goto Npos4:
+	iaddq $1, %rax				# count++
+Npos4:
+	mrmovq 40(%rdi), %r11	# read val from src...
+	rmmovq %r10, 32(%rsi)	# ...and store it to dst
+	andq %r10, %r10				# val <= 0?
+	jle Npos5							# if so, goto Npos5:
+	iaddq $1, %rax				# count++
+Npos5:
+	mrmovq 48(%rdi), %r10	# read val from src...
+	rmmovq %r11, 40(%rsi)	# ...and store it to dst
+	andq %r11, %r11				# val <= 0?
+	jle Npos6							# if so, goto Npos6:
+	iaddq $1, %rax				# count++
+Npos6:
+	mrmovq 56(%rdi), %r11	# read val from src...
+	rmmovq %r10, 48(%rsi)	# ...and store it to dst
+	andq %r10, %r10				# val <= 0?
+	jle Npos7							# if so, goto Npos7:
+	iaddq $1, %rax				# count++
+Npos7:
+	mrmovq 64(%rdi), %r10	# read val from src...
+	rmmovq %r11, 56(%rsi)	# ...and store it to dst
+	andq %r11, %r11				# val <= 0?
+	jle Npos8							# if so, goto Npos8:
+	iaddq $1, %rax
+Npos8:
+	mrmovq 72(%rdi), %r11	# read val from src...
+	rmmovq %r10, 64(%rsi)	# ...and store it to dst
+	andq %r10, %r10				# val <= 0?
+	jle Npos9							# if so, goto Npos9:
+	iaddq $1, %rax				# count++
+Npos9:
+	rmmovq %r11, 72(%rsi)	# ...and store it to dst
+	andq %r11, %r11				# val <= 0?
+	jle Unroll						# if so, goto Unroll:
+	iaddq $1, %rax				# count++
+Unroll:
+	iaddq $80, %rdi				# src += 10
+	iaddq $80, %rsi				# dst += 10
+	iaddq $-10,%rdx				# len >= 10?
+	jge Npos0							# if so, goto Npos0:
+
+DoRest:
+	iaddq $10, %rdx					# calculate the index at jumptable
+	addq %rdx, %rdx
+	addq %rdx, %rdx
+	addq %rdx, %rdx
+	iaddq jumptable, %rdx
+	mrmovq (%rdx), %rdx
+	subq %r13, %r13					# set condition codes for the calculations below
+	jmpq %rdx
+
+	jumptable:							# jumptable values
+		.quad Done
+		.quad CF1
+		.quad CF2
+		.quad CF3
+		.quad CF4
+		.quad CF5
+		.quad CF6
+		.quad CF7
+		.quad CF8
+		.quad CF9
+
+CF9:
+	mrmovq 64(%rdi), %r11		# read val from src...
+	rmmovq %r11, 64(%rsi)		# and cpy into dst
+	andq %r11, %r11					# val <= 0?
+CF8:
+	mrmovq 56(%rdi), %r11		# read val from src...
+	jle CF8COND							# if so, jump to CC Set and Copy for 8th element
+	iaddq $1, %rax					# count++
+CF8COND:
+	rmmovq %r11, 56(%rsi)		# cpy into dest
+	andq %r11, %r11					# val <= 0?
+CF7:
+	mrmovq 48(%rdi), %r11		# read val from src...
+	jle CF7COND							# if so, jump to CC Set and Copy for 7th element
+	iaddq $1, %rax					# count++
+CF7COND:
+	rmmovq %r11, 48(%rsi)		# cpy into dest
+	andq %r11, %r11					# val <= 0?
+CF6:
+	mrmovq 40(%rdi), %r11		# read val from src...
+	jle CF6COND							# if so, jump to CC Set and Copy for 6th element
+	iaddq $1, %rax					# count++
+CF6COND:
+	rmmovq %r11, 40(%rsi)		# cpy into dest
+	andq %r11, %r11					# val <= 0?
+CF5:
+	mrmovq 32(%rdi), %r11		# read val from src...
+	jle CF5COND							# if so, jump to CC Set and Copy for 5th element
+	iaddq $1, %rax					# count++
+CF5COND:
+	rmmovq %r11, 32(%rsi)		# cpy into dest
+	andq %r11, %r11					# val <= 0?
+CF4:
+	mrmovq 24(%rdi), %r11		# read val from src...
+	jle CF4COND							# if so, jump to CC Set and Copy for 4th element
+	iaddq $1, %rax					# count++
+CF4COND:
+	rmmovq %r11, 24(%rsi)		# cpy into dst
+	andq %r11, %r11					# val <= 0?
+CF3:
+	mrmovq 16(%rdi), %r11		# read val from src...
+	jle CF3COND							# # if so, jump to CC Set and Copy for 3rd element
+	iaddq $1, %rax					# count++
+CF3COND:
+	rmmovq %r11, 16(%rsi)		# cpy into dst
+	andq %r11, %r11					# val <= 0?
+CF2:
+	mrmovq 8(%rdi), %r11		# read val from src...
+	jle CF2COND							# # if so, jump to CC Set and Copy for 2nd element
+	iaddq $1, %rax					# count++
+CF2COND:
+	rmmovq %r11, 8(%rsi)		# cpy into dst
+	andq %r11, %r11					# val <= 0?
+CF1:
+	mrmovq (%rdi), %r11			# read val from src...
+	jle CF1COND							# # if so, jump to CC Set and Copy for 1st element
+	iaddq $1, %rax					# count++
+CF1COND:
+	rmmovq %r11, (%rsi)			# cpy into dst
+	andq %r11, %r11					# val <= 0?
+	jle Done								# if so, goto Done
+	iaddq $1, %rax					# count++
+
+
+
+##################################################################
+# Do not modify the following section of code
+# Function epilogue.
+Done:
+	ret
+##################################################################
+# Keep the following label at the end of your function
+End:
+#/* $end ncopy-ys */

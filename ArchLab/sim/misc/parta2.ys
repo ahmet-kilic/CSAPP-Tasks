@@ -1,0 +1,55 @@
+    .pos 0 # setup code
+    irmovq stack, %rsp
+    call main
+    halt
+
+# the array to reverse
+.pos 0x100
+ele0:
+    .quad 0x0000a
+    .quad ele1
+ele1:
+    .quad 0x000b0
+    .quad ele2
+ele2:
+    .quad 0x00c00
+    .quad ele3
+ele3:
+    .quad 0x0d000
+    .quad ele4
+ele4:
+    .quad 0xe0000
+    .quad 0
+
+main:
+    irmovq ele0, %rdi
+    call rrev
+    ret
+
+# Part A
+rrev:
+    # head = %rdi
+    pushq   %rbx        # rev_head
+    rrmovq  %rdi, %rbx       # check head or head->next if 0
+    andq    %rdi, %rdi
+    je rhead
+    mrmovq  8(%rdi), %rdi
+    andq    %rdi, %rdi
+    je rnext
+    call rrev
+    mrmovq  8(%rbx), %r10   # r10 = head->next
+    rmmovq  %rbx, 8(%r10)   # r10->next = rbx
+    irmovq  $0, %r9
+    rmmovq  %r9, 8(%rbx)     # head = 0
+poprbx:
+    popq %rbx
+    ret
+rhead:
+    rrmovq %rdi, %rax
+    jmp poprbx
+rnext:
+    rrmovq %rbx, %rax
+    jmp poprbx
+# stack grows upwards, so leave some space
+.pos 0x300
+stack:
